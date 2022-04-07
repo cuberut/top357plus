@@ -1,10 +1,12 @@
 // ==UserScript==
-// @name       TOP357+
-// @version    0.0.1
-// @author     cuberut
-// @include    https://top.radio357.pl/app/polski-top/glosowanie
-// @updateURL  https://raw.githubusercontent.com/cuberut/top357plus/main/top357plus.js
-// @grant      GM_addStyle
+// @name         TOP357+
+// @version      0.2
+// @author       cuberut
+// @description  Wspomaganie głosowania
+// @include      https://top.radio357.pl/app/polski-top/glosowanie
+// @updateURL    https://raw.githubusercontent.com/cuberut/top357plus/main/top357plus.js
+// @downloadURL  https://raw.githubusercontent.com/cuberut/top357plus/main/top357plus.js
+// @grant        GM_addStyle
 // ==/UserScript==
 
 GM_addStyle("div#loadbar { width: 100%; background-color: #ddd;}");
@@ -214,7 +216,7 @@ const getVotes = (setList) => {
     if (votes) {
         votes.forEach(id => { myVotes[id] = true });
         setList.forEach(item => { item.vote = myVotes[item.id] });
-    }  
+    }
 }
 
 const setVotes = () => {
@@ -275,6 +277,8 @@ const setVoteSection = () => {
         let loadbar, loading, progress;
         let items = [];
         let itemsCounter = 0;
+        let visible;
+        let ids = {};
 
         const interval = setInterval(() => {
             if (!voteList) {
@@ -293,25 +297,34 @@ const setVoteSection = () => {
             }
 
             if (loading) {
-                let visible = voteList.querySelectorAll('.list-group-item:not([hidden])');
+                visible = voteList.querySelectorAll('.list-group-item:not([hidden])');
 
-                if (itemsCounter < setCounter) {
-                    visible.forEach(item => { item.hidden = true });
-                    itemsCounter += visible.length;
+                if (visible.length || itemsCounter == setCounter) {
+                    setTimeout(function(){
+                        visible.forEach(item => {
+                            item.hidden = true;
+                            let id = item.querySelector('input').value;
+                            ids[id] = true;
+                            itemsCounter = Object.keys(ids).length;
+                        });
+                    }, 0);
+
                     items = [...items, ...visible];
                     progress = (itemsCounter/setCounter) * 100;
                     loading.style.width = progress + '%';
-                } else {
-                    loading.hidden = true;
-                    setSearch(voteList, items);
-                    clearInterval(interval);
-                    items.forEach(item => { item.hidden = false });
-                    showScroll(true);
-                    addTags(setList);
-                    setVoteSection();
-                    toggleVisibility(voteList);
+
+                    if (itemsCounter == setCounter) {
+                        setSearch(voteList, items);
+                        clearInterval(interval);
+                        items.forEach(item => { item.hidden = false });
+                        showScroll(true);
+                        addTags(setList);
+                        setVoteSection();
+                        loading.hidden = true;
+                        toggleVisibility(voteList);
+                    }
                 }
             }
-        }, 500);
+        }, 25);
     });
 })();
