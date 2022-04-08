@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.2
+// @version      0.0.3
 // @author       cuberut
 // @description  Wspomaganie głosowania
 // @include      https://top.radio357.pl/app/polski-top/glosowanie
@@ -278,7 +278,6 @@ const setVoteSection = () => {
         let items = [];
         let itemsCounter = 0;
         let visible;
-        let ids = {};
 
         const interval = setInterval(() => {
             if (!voteList) {
@@ -303,9 +302,11 @@ const setVoteSection = () => {
                     setTimeout(function(){
                         visible.forEach(item => {
                             item.hidden = true;
-                            let id = item.querySelector('input').value;
-                            ids[id] = true;
-                            itemsCounter = Object.keys(ids).length;
+
+                            if (!item.counted) {
+                                itemsCounter++;
+                                item.counted = true;
+                            }
                         });
                     }, 0);
 
