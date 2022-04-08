@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.0.3
+// @version      0.1
 // @author       cuberut
 // @description  Wspomaganie głosowania
 // @include      https://top.radio357.pl/app/polski-top/glosowanie
@@ -71,11 +71,14 @@ const changeInfoStatus = () => {
 
 const setOrder = (element, rest, dic) => {
     element.onclick = (e) => {
-        resetSelectors();
         const checked = e.target.checked;
-        dic.forEach(index => { listGroup.append(itemList[index])});
-        rest.forEach(x => { x.checked = false });
-        changeInfoStatus();
+
+        if (checked) {
+            dic.forEach(index => { listGroup.append(itemList[index])});
+            rest.forEach(x => { x.checked = false });
+        } else {
+            element.checked = true;
+        }
     }
 }
 
@@ -85,21 +88,23 @@ const addCheckboxes = (setList) => {
     extraTools.insertAdjacentHTML('beforeend', `<p id="checkboxes"></p>`);
     checkboxes = voteList.querySelector("#checkboxes");
 
+    const orderList = [...setList].map((item, i) => ({ no: i, year: +item.year }));
+
     checkboxes.insertAdjacentHTML('beforeend', setCheckOrderAscending());
     const orderAscending = checkboxes.querySelector("#orderAscending");
-    const dicAscending = [...setList].map(item => item.no);
+    const dicAscending = orderList.map(item => item.no);
 
     checkboxes.insertAdjacentHTML('beforeend', setCheckOrderByOldest());
     const orderByOldest = checkboxes.querySelector("#orderByOldest");
-    const dicByOldest = [...setList].sort((a, b) => (a.year < b.year) ? -1 : 1).map(item => item.no);
+    const dicByOldest = orderList.sort((a, b) => (a.year < b.year) ? -1 : 1).map(item => item.no);
 
     checkboxes.insertAdjacentHTML('beforeend', setCheckOrderDescending());
     const orderDescending = checkboxes.querySelector("#orderDescending");
-    const dicDescending = [...setList].map(item => item.no).reverse();
+    const dicDescending = [...dicAscending].reverse();
 
     checkboxes.insertAdjacentHTML('beforeend', setCheckOrderByNewest());
     const orderByNewest = checkboxes.querySelector("#orderByNewest");
-    const dicByNewest = [...setList].sort((a, b) => (a.year > b.year) ? -1 : 1).map(item => item.no);
+    const dicByNewest = orderList.sort((a, b) => (a.year > b.year) ? -1 : 1).map(item => item.no);
 
     setOrder(orderAscending, [orderDescending, orderByOldest, orderByNewest], dicAscending);
     setOrder(orderDescending, [orderAscending, orderByOldest, orderByNewest], dicDescending);
@@ -120,7 +125,6 @@ const setSelector = (element, keys) => {
         changeInfoStatus();
     }
 }
-
 
 let selectors;
 
