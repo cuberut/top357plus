@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.1
+// @version      0.2
 // @author       cuberut
 // @description  Wspomaganie głosowania
-// @include      https://top.radio357.pl/app/polski-top/glosowanie
+// @match        https://lista.radio357.pl/app/top/glosowanie
 // @updateURL    https://raw.githubusercontent.com/cuberut/top357plus/main/top357plus.js
 // @downloadURL  https://raw.githubusercontent.com/cuberut/top357plus/main/top357plus.js
 // @grant        GM_addStyle
@@ -11,14 +11,16 @@
 
 GM_addStyle("div#loadbar { width: 100%; background-color: #ddd;}");
 GM_addStyle("div#loading { width: 0%; height: 2rem; background-color: #337AB7; padding: 0.25rem 0.5rem; }");
+GM_addStyle("div.tagNew { position: absolute; right: 0; margin-right: 100px; }");
 GM_addStyle("div.tagLog { width: 110px; position: absolute; right: 0; margin-right: 60px; text-align: left; }");
 GM_addStyle("div#extraTools label, div#extraTools select { display: inline-block; width: 50%; }");
-GM_addStyle("span#infoVisible { display: inline-block; text-align: right; width: 30px; }");
+GM_addStyle("div#extraTools #selectors { width: 50%; padding-right: 1em }");
+GM_addStyle("span#infoVisible { display: inline-block; text-align: right; width: 40px; }");
 GM_addStyle("div#votes { position: absolute; left: 10px; width: auto; text-align: center; }");
 GM_addStyle("div#votedList ol { font-size: small; padding-left: 1.5em; margin-top: 1em; }");
 GM_addStyle("div#votedList ol li:hover { text-decoration: line-through; cursor: pointer; }");
 
-const urlSettingsList = 'https://opensheet.elk.sh/1lAXlMeuXmY-QIbGIMFb6PMx3ya6L-pLbOMNf2NKNzvE/settingsList';
+const urlSettingsList = 'https://opensheet.elk.sh/1GxtFKaVifd9lTDNCjB65BFSqUl7L6SIprK9OwxZCUno/settings';
 
 const getList = async (url) => {
     const response = await fetch(url);
@@ -28,6 +30,9 @@ const getList = async (url) => {
 
 const setInfoStatus = (amount) => `<p id="infoStatus">Liczba widocznych utworów: <strong><span id="infoVisible">${amount}</span>/<span>${amount}</span></strong> (<span id="infoPercent">100</span>%)`;
 
+const setCheckOnlyIsNew = (amount) => `<label class="form-check-label"><input id="onlyIsNew" type="checkbox" ${amount || 'disabled'}><span>Pokaż tylko nowości - ${amount} pozycji</span></label>`;
+const setCheckHideRanked = (amount) => `<label class="form-check-label"><input id="hideRanked" type="checkbox" ${amount || 'disabled'}><span>Ukryj notowane utwory - ${amount} pozycji</span></label>`;
+
 const setCheckOrderAscending = () => `<label class="form-check-label"><input id="orderAscending" type="checkbox" checked>Sortuj alfabetycznie rosnąco</label>`;
 const setCheckOrderDescending = () => `<label class="form-check-label"><input id="orderDescending" type="checkbox">Sortuj alfabetycznie malejąco</label>`;
 
@@ -36,8 +41,12 @@ const setCheckOrderByNewest = () => `<label class="form-check-label"><input id="
 
 const setSelectByYears = () => `<label class="form-check-label">Pokaż tylko utwory z lat:</label><select id="chooseByYears"></select>`;
 
-const getTagYearLog = (year) => {
-    return `<div class="chart-item__info tagLog"><span>Rok wydania: ${year}</span></div>`
+const tagNew = '<span class="badge badge-primary tagNew">Nowość!</span>';
+
+const getTagLog = (year, rank) => {
+    const yearPart = `<span>Rok wydania: ${year}</span>`;
+    const rankPart = rank ? `<span>Ostatnia pozycja: ${rank}</span>` : '';
+    return `<div class="chart-item__info tagLog">${yearPart}<br/><br/>${rankPart}</div>`
 };
 
 let extraTools, amountAll, infoVisible, infoPercent;
@@ -69,6 +78,31 @@ const changeInfoStatus = () => {
     }
 }
 
+const setCheckboxOnly = (element, rest, dic) => {
+    element.onclick = (e) => {
+        const checked = e.target.checked;
+        mainList.forEach((item, i) => { item.hidden = !dic[i] && checked });
+        rest.forEach(x => { x.checked = false });
+        changeInfoStatus();
+    }
+}
+
+const setCheckboxHide = (element, rest, list, others) => {
+    element.onclick = (e) => {
+        const checked = e.target.checked;
+        const otherChecked = others.some(x => x.checked);
+
+        if (checked && !otherChecked) {
+            mainList.forEach(item => { item.hidden = false });
+        }
+
+        list.forEach(index => { mainList[index].hidden = checked });
+        rest.forEach(x => { x.checked = false });
+
+        changeInfoStatus();
+    }
+}
+
 const setOrder = (element, rest, dic) => {
     element.onclick = (e) => {
         const checked = e.target.checked;
@@ -82,28 +116,43 @@ const setOrder = (element, rest, dic) => {
     }
 }
 
-let checkboxes;
+let checkboxes1, checkboxes2;
 
 const addCheckboxes = (setList) => {
-    extraTools.insertAdjacentHTML('beforeend', `<p id="checkboxes"></p>`);
-    checkboxes = voteList.querySelector("#checkboxes");
+    extraTools.insertAdjacentHTML('beforeend', `<p id="chb1" class="checkboxes1"></p>`);
+    checkboxes1 = voteList.querySelector("#chb1");
+
+    const checkOnlyIsNew = setCheckOnlyIsNew(listIsNew.length);
+    checkboxes1.insertAdjacentHTML('beforeend', checkOnlyIsNew);
+    const onlyIsNew = checkboxes1.querySelector("#onlyIsNew");
+    const dicIsNew = listIsNew.reduce((dic, key) => ({...dic, [key]: true}), {});
+
+    const checkHideRanked = setCheckHideRanked(listLastP.length);
+    checkboxes1.insertAdjacentHTML('beforeend', checkHideRanked);
+    const hideRanked = checkboxes1.querySelector("#hideRanked");
+
+    setCheckboxOnly(onlyIsNew, [hideRanked], dicIsNew);
+    setCheckboxHide(hideRanked, [onlyIsNew], listLastP, []);
+
+    extraTools.insertAdjacentHTML('beforeend', `<p id="chb2" id="checkboxes"></p>`);
+    checkboxes2 = voteList.querySelector("#chb2");
 
     const orderList = [...setList].map((item, i) => ({ no: i, year: +item.year }));
 
-    checkboxes.insertAdjacentHTML('beforeend', setCheckOrderAscending());
-    const orderAscending = checkboxes.querySelector("#orderAscending");
+    checkboxes2.insertAdjacentHTML('beforeend', setCheckOrderAscending());
+    const orderAscending = checkboxes2.querySelector("#orderAscending");
     const dicAscending = orderList.map(item => item.no);
 
-    checkboxes.insertAdjacentHTML('beforeend', setCheckOrderByOldest());
-    const orderByOldest = checkboxes.querySelector("#orderByOldest");
+    checkboxes2.insertAdjacentHTML('beforeend', setCheckOrderByOldest());
+    const orderByOldest = checkboxes2.querySelector("#orderByOldest");
     const dicByOldest = orderList.sort((a, b) => (a.year < b.year) ? -1 : 1).map(item => item.no);
 
-    checkboxes.insertAdjacentHTML('beforeend', setCheckOrderDescending());
-    const orderDescending = checkboxes.querySelector("#orderDescending");
+    checkboxes2.insertAdjacentHTML('beforeend', setCheckOrderDescending());
+    const orderDescending = checkboxes2.querySelector("#orderDescending");
     const dicDescending = [...dicAscending].reverse();
 
-    checkboxes.insertAdjacentHTML('beforeend', setCheckOrderByNewest());
-    const orderByNewest = checkboxes.querySelector("#orderByNewest");
+    checkboxes2.insertAdjacentHTML('beforeend', setCheckOrderByNewest());
+    const orderByNewest = checkboxes2.querySelector("#orderByNewest");
     const dicByNewest = orderList.sort((a, b) => (a.year > b.year) ? -1 : 1).map(item => item.no);
 
     setOrder(orderAscending, [orderDescending, orderByOldest, orderByNewest], dicAscending);
@@ -142,7 +191,7 @@ const addSelectors = (setList) => {
 const resetSelectors = () => selectors.querySelectorAll('select').forEach(select => { select.value = "" });
 
 let voteList, listGroup, mainList, itemList;
-let listVoted, listBet, listOld;
+let listIsNew, listLastP, listVoted;
 
 const addTags = (setList) => {
     voteList = document.querySelector('.vote-list')
@@ -151,19 +200,24 @@ const addTags = (setList) => {
     itemList = [...mainList];
 
     setList.forEach((item, i) => {
-        const {year, years, vote} = item;
+        const {isNew, lastP, year, years, vote} = item;
         const element = mainList[i].querySelector('.vote-item');
+        const label = element.querySelector('label');
 
-        if (year) {
-            const tagYear = getTagYearLog(year);
-            element.insertAdjacentHTML('beforeend', tagYear);
+        if (isNew) {
+            label.insertAdjacentHTML('afterend', tagNew);
         }
+
+        const tagYear = getTagLog(year, lastP);
+        element.insertAdjacentHTML('beforeend', tagYear);
 
         if (vote) {
             element.querySelector('input')?.click();
         }
     });
 
+    listIsNew = setList.reduce((list, item, i) => item.isNew ? [...list, i] : list, []);
+    listLastP = setList.reduce((list, item, i) => item.lastP ? [...list, i] : list, []);
     listVoted = setList.reduce((list, item, i) => item.votes ? [...list, i] : list, []);
 
     setList.forEach((item, i) => {
