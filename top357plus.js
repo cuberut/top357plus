@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.2
+// @version      0.3.1
 // @author       cuberut
 // @description  Wspomaganie głosowania
 // @match        https://lista.radio357.pl/app/top/glosowanie
@@ -19,8 +19,13 @@ GM_addStyle("span#infoVisible { display: inline-block; text-align: right; width:
 GM_addStyle("div#votes { position: absolute; left: 10px; width: auto; text-align: center; }");
 GM_addStyle("div#votedList ol { font-size: small; padding-left: 1.5em; margin-top: 1em; }");
 GM_addStyle("div#votedList ol li:hover { text-decoration: line-through; cursor: pointer; }");
+GM_addStyle("ul.list-group .artistGroup { border-width: 1px 3px; border-color: #bbb; border-style: solid; cursor: pointer; }");
+GM_addStyle("ul.list-group .artistRow { border-width: 0px 3px 1px; }");
+GM_addStyle("ul.list-group .artistEnd { border-bottom-width: 3px; }");
 
-const urlSettingsList = 'https://opensheet.elk.sh/1GxtFKaVifd9lTDNCjB65BFSqUl7L6SIprK9OwxZCUno/settings';
+const urlApi = 'https://opensheet.elk.sh/1GxtFKaVifd9lTDNCjB65BFSqUl7L6SIprK9OwxZCUno';
+const urlSettings = `${urlApi}/settings`;
+const urlArtists = `${urlApi}/artists`;
 
 const getList = async (url) => {
     const response = await fetch(url);
@@ -48,6 +53,10 @@ const getTagLog = (year, rank) => {
     const rankPart = rank ? `<span>Ostatnia pozycja: ${rank}</span>` : '';
     return `<div class="chart-item__info tagLog">${yearPart}<br/><br/>${rankPart}</div>`
 };
+
+const getArtistInfo = (artist, checked) => {
+    return `<i class="icon mr-4 text-muted fas fa-chevron-down"></i><strong>${artist.name}</strong> - [<span>0</span>/${artist.amount}]`;
+}
 
 let extraTools, amountAll, infoVisible, infoPercent;
 
@@ -83,7 +92,10 @@ const setCheckboxOnly = (element, rest, dic) => {
         const checked = e.target.checked;
         mainList.forEach((item, i) => { item.hidden = !dic[i] && checked });
         rest.forEach(x => { x.checked = false });
+
+        hideArtistGroup(checked);
         changeInfoStatus();
+        resetSelectors();
     }
 }
 
@@ -100,6 +112,7 @@ const setCheckboxHide = (element, rest, list, others) => {
         rest.forEach(x => { x.checked = false });
 
         changeInfoStatus();
+        resetSelectors();
     }
 }
 
@@ -171,6 +184,7 @@ const setSelector = (element, keys) => {
     element.onchange = (e) => {
         const value = e.target.value;
         mainList.forEach((item, i) => { item.hidden = keys[value] ? !keys[value].list.includes(item.querySelector('input').value) : false });
+        hideArtistGroup(!!value);
         changeInfoStatus();
     }
 }
@@ -192,6 +206,7 @@ const resetSelectors = () => selectors.querySelectorAll('select').forEach(select
 
 let voteList, listGroup, mainList, itemList;
 let listIsNew, listLastP, listVoted;
+let artistGroups, dicArtist = {}, dicSong = {};
 
 const addTags = (setList) => {
     voteList = document.querySelector('.vote-list')
@@ -200,7 +215,7 @@ const addTags = (setList) => {
     itemList = [...mainList];
 
     setList.forEach((item, i) => {
-        const {isNew, lastP, year, years, vote} = item;
+        const {id, isNew, lastP, year, years, vote, artistId} = item;
         const element = mainList[i].querySelector('.vote-item');
         const label = element.querySelector('label');
 
@@ -213,6 +228,15 @@ const addTags = (setList) => {
 
         if (vote) {
             element.querySelector('input')?.click();
+        }
+
+        if (artistId) {
+            if (dicArtist[artistId]) {
+                dicArtist[artistId].rows.push(i);
+            } else {
+                dicArtist[artistId] = { checked: false, rows: [i] }
+            }
+            dicSong[id] = artistId;
         }
     });
 
@@ -267,6 +291,73 @@ const setSearch = (voteList, items) => {
     });
 }
 
+const addArtistGroups = (loading) => {
+    getList(urlArtists).then(artistList => {
+        artistList.forEach(artist => {
+            dicArtist[artist.id].rows.forEach((row, i) => {
+                const button = mainList[row];
+                button.classList.add("artistRow");
+                if (i == 0) {
+                    const group = document.createElement('div');
+                    group.id = `g-${artist.id}`;
+                    group.classList.add('artistGroup');
+                    group.insertAdjacentHTML('afterbegin', getArtistInfo(artist, 0));
+
+                    group.onclick = (e) => {
+                        const clickedGroup = e.currentTarget;
+                        clickedGroup.classList.toggle("artistEnd");
+
+                        const icon = clickedGroup.querySelector('i');
+                        icon.classList.toggle('fa-chevron-right');
+                        icon.classList.toggle('fa-chevron-down');
+
+                        let votedCounter = 0;
+                        const checked = dicArtist[artist.id].checked;
+                        dicArtist[artist.id].rows.forEach(rowId => {
+                            mainList[rowId].hidden = !checked;
+
+                            const input = mainList[rowId].querySelector('input[type="checkbox"]');
+
+                            if (input.checked) {
+                                votedCounter++;
+                            }
+                        });
+                        dicArtist[artist.id].checked = !checked;
+
+                        const votedValue = clickedGroup.querySelector('span');
+                        votedValue.textContent = votedCounter;
+                        changeInfoStatus();
+                    }
+                    listGroup.insertBefore(group, button);
+                } else if (i == artist.amount-1) {
+                    button.classList.add("artistEnd");
+                }
+
+                const input = mainList[row].querySelector('input[type="checkbox"]');
+                input.onclick = (e) => {
+                    const checked = e.target.checked;
+                    const songId = e.target.value;
+                    const id = dicSong[songId];
+                    const group = listGroup.querySelector(`div#g-${id}`);
+                    const votedValue = group.querySelector('span');
+                    if (checked) {
+                        votedValue.textContent++;
+                    } else {
+                        votedValue.textContent--;
+                    }
+                }
+            });
+        });
+        artistGroups = listGroup.querySelectorAll("div.artistGroup");
+        loading.hidden = true;
+        toggleVisibility(voteList);
+    });
+}
+
+const hideArtistGroup = (state) => {
+    artistGroups.forEach(group => { group.hidden = state });
+}
+
 const getVotes = (setList) => {
     const myVotes = {};
     const votes = JSON.parse(localStorage.getItem("myTopVotes"));
@@ -306,8 +397,9 @@ const setVoteSection = () => {
             const checkedItems = voteList.querySelectorAll('ul.list-group input[type="checkbox"]:checked')
             const list = [...checkedItems].reduce((list, item) => {
                 const id = item.id;
-                const song = item.parentElement.lastChild.innerText.replace("\n", " - ");
-                return `${list}<li for="${id}">${song}</li>`;
+                const songElement = item.parentElement.querySelector('label');
+                const songValue = songElement.innerText.replace("\n", " - ");
+                return `${list}<li for="${id}">${songValue}</li>`;
             }, "");
 
             votedList.textContent = null
@@ -328,7 +420,7 @@ const setVoteSection = () => {
 (function() {
     showScroll(false);
 
-    getList(urlSettingsList).then(setList => {
+    getList(urlSettings).then(setList => {
         const setCounter = setList.length;
 
         let voteList, listNo;
@@ -379,8 +471,7 @@ const setVoteSection = () => {
                         showScroll(true);
                         addTags(setList);
                         setVoteSection();
-                        loading.hidden = true;
-                        toggleVisibility(voteList);
+                        addArtistGroups(loading);
                     }
                 }
             }
