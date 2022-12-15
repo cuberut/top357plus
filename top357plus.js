@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.3.3
+// @version      0.3.4
 // @author       cuberut
 // @description  Wspomaganie głosowania
 // @match        https://lista.radio357.pl/app/top/glosowanie
@@ -280,9 +280,15 @@ const setSearch = (voteList, items) => {
     }));
     searchCustom.addEventListener('change', (e) => {
         const value = e.target.value.toLowerCase();
+        hideGroups(!!value);
         listElement.map(item => {
             item.element.hidden = !(item.author.includes(value) || item.title.includes(value));
         });
+        if (!value) {
+            setGroups();
+        } else {
+            changeInfoStatus();
+        }
     });
 }
 
