@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.3.2
+// @version      0.3.3
 // @author       cuberut
 // @description  Wspomaganie głosowania
 // @match        https://lista.radio357.pl/app/top/glosowanie
@@ -51,12 +51,6 @@ const setInfoStatus = (amount) => `<p id="infoStatus">Liczba widocznych utworów
 
 const setCheckOnlyIsNew = (amount) => `<label class="form-check-label"><input id="onlyIsNew" type="checkbox" ${amount || 'disabled'}><span>Pokaż tylko nowości - ${amount} pozycji</span></label>`;
 const setCheckShrinkAll = (amount) => `<label class="form-check-label"><input id="shrinkAll" type="checkbox" ${amount || 'disabled'}><span>Zwiń wszystkie grupy - ${amount} pozycji</span></label>`;
-
-const setCheckOrderAscending = () => `<label class="form-check-label"><input id="orderAscending" type="checkbox" checked>Sortuj alfabetycznie rosnąco</label>`;
-const setCheckOrderDescending = () => `<label class="form-check-label"><input id="orderDescending" type="checkbox">Sortuj alfabetycznie malejąco</label>`;
-
-const setCheckOrderByOldest = () => `<label class="form-check-label"><input id="orderByOldest" type="checkbox">Sortuj wg najstarszych</label>`;
-const setCheckOrderByNewest = () => `<label class="form-check-label"><input id="orderByNewest" type="checkbox">Sortuj wg najmłodszych</label>`;
 
 const setSelectByYears = () => `<label class="form-check-label">Pokaż tylko utwory z lat:</label><select id="chooseByYears"></select>`;
 
@@ -148,21 +142,6 @@ const setCheckboxHide = (element, rest) => {
     }
 }
 
-const setOrder = (element, rest, dic) => {
-    element.onclick = (e) => {
-        const checked = e.target.checked;
-
-        if (checked) {
-            dic.forEach(index => { listGroup.append(itemList[index])});
-            rest.forEach(x => { x.checked = false });
-        } else {
-            element.checked = true;
-        }
-
-        hideGroups(checked);
-    }
-}
-
 let checkboxes1, checkboxes2;
 
 const addCheckboxes = (setList) => {
@@ -183,29 +162,6 @@ const addCheckboxes = (setList) => {
 
     extraTools.insertAdjacentHTML('beforeend', `<p id="chb2" id="checkboxes"></p>`);
     checkboxes2 = voteList.querySelector("#chb2");
-
-    const orderList = [...setList].map((item, i) => ({ no: i, year: +item.year }));
-
-    checkboxes2.insertAdjacentHTML('beforeend', setCheckOrderAscending());
-    const orderAscending = checkboxes2.querySelector("#orderAscending");
-    const dicAscending = orderList.map(item => item.no);
-
-    checkboxes2.insertAdjacentHTML('beforeend', setCheckOrderByOldest());
-    const orderByOldest = checkboxes2.querySelector("#orderByOldest");
-    const dicByOldest = orderList.sort((a, b) => (a.year < b.year) ? -1 : 1).map(item => item.no);
-
-    checkboxes2.insertAdjacentHTML('beforeend', setCheckOrderDescending());
-    const orderDescending = checkboxes2.querySelector("#orderDescending");
-    const dicDescending = [...dicAscending].reverse();
-
-    checkboxes2.insertAdjacentHTML('beforeend', setCheckOrderByNewest());
-    const orderByNewest = checkboxes2.querySelector("#orderByNewest");
-    const dicByNewest = orderList.sort((a, b) => (a.year > b.year) ? -1 : 1).map(item => item.no);
-
-    setOrder(orderAscending, [orderDescending, orderByOldest, orderByNewest], dicAscending);
-    setOrder(orderDescending, [orderAscending, orderByOldest, orderByNewest], dicDescending);
-    setOrder(orderByOldest, [orderAscending, orderDescending, orderByNewest], dicByOldest);
-    setOrder(orderByNewest, [orderAscending, orderDescending, orderByOldest], dicByNewest);
 }
 
 const years = { "0": {list:[], name: "NIEPRZYPISANE"} }
@@ -217,7 +173,7 @@ const setSelector = (element, keys) => {
     element.onchange = (e) => {
         const value = e.target.value;
         mainList.forEach((item, i) => { item.hidden = keys[value] ? !keys[value].list.includes(item.querySelector('input').value) : false });
-        shrinkAll(!!value);
+        hideGroups(!!value);
         changeInfoStatus();
     }
 }
