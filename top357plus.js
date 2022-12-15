@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.3.1
+// @version      0.3.2
 // @author       cuberut
 // @description  Wspomaganie głosowania
 // @match        https://lista.radio357.pl/app/top/glosowanie
@@ -19,13 +19,13 @@ GM_addStyle("span#infoVisible { display: inline-block; text-align: right; width:
 GM_addStyle("div#votes { position: absolute; left: 10px; width: auto; text-align: center; }");
 GM_addStyle("div#votedList ol { font-size: small; padding-left: 1.5em; margin-top: 1em; }");
 GM_addStyle("div#votedList ol li:hover { text-decoration: line-through; cursor: pointer; }");
-GM_addStyle("ul.list-group .artistGroup { border-width: 1px 3px; border-color: #bbb; border-style: solid; cursor: pointer; }");
-GM_addStyle("ul.list-group .artistRow { border-width: 0px 3px 1px; }");
-GM_addStyle("ul.list-group .artistEnd { border-bottom-width: 3px; }");
+GM_addStyle("ul.songGroups .gInfo { border-width: 1px 3px; border-color: #bbb; border-style: solid; cursor: pointer; }");
+GM_addStyle("ul.songGroups .gRow { border-width: 0px 3px 1px; }");
+GM_addStyle("ul.songGroups .gEnd { border-bottom-width: 3px; }");
 
 const urlApi = 'https://opensheet.elk.sh/1GxtFKaVifd9lTDNCjB65BFSqUl7L6SIprK9OwxZCUno';
 const urlSettings = `${urlApi}/settings`;
-const urlArtists = `${urlApi}/artists`;
+const urlGroups = `${urlApi}/groups`;
 
 const getList = async (url) => {
     const response = await fetch(url);
@@ -33,10 +33,24 @@ const getList = async (url) => {
     return await myJson;
 }
 
+const loadData = (key) => JSON.parse(localStorage.getItem(key));
+
+const changeData = (key, value, isRemoved) => {
+    const oldData = loadData(key) || [];
+    const newData = isRemoved
+        ? oldData.filter(x => x!=value)
+        : [...oldData, value];
+    localStorage.setItem(key, JSON.stringify(newData));
+}
+
+const changeAllData = (key, list) => {
+    localStorage.setItem(key, JSON.stringify(list));
+}
+
 const setInfoStatus = (amount) => `<p id="infoStatus">Liczba widocznych utworów: <strong><span id="infoVisible">${amount}</span>/<span>${amount}</span></strong> (<span id="infoPercent">100</span>%)`;
 
 const setCheckOnlyIsNew = (amount) => `<label class="form-check-label"><input id="onlyIsNew" type="checkbox" ${amount || 'disabled'}><span>Pokaż tylko nowości - ${amount} pozycji</span></label>`;
-const setCheckHideRanked = (amount) => `<label class="form-check-label"><input id="hideRanked" type="checkbox" ${amount || 'disabled'}><span>Ukryj notowane utwory - ${amount} pozycji</span></label>`;
+const setCheckShrinkAll = (amount) => `<label class="form-check-label"><input id="shrinkAll" type="checkbox" ${amount || 'disabled'}><span>Zwiń wszystkie grupy - ${amount} pozycji</span></label>`;
 
 const setCheckOrderAscending = () => `<label class="form-check-label"><input id="orderAscending" type="checkbox" checked>Sortuj alfabetycznie rosnąco</label>`;
 const setCheckOrderDescending = () => `<label class="form-check-label"><input id="orderDescending" type="checkbox">Sortuj alfabetycznie malejąco</label>`;
@@ -51,11 +65,11 @@ const tagNew = '<span class="badge badge-primary tagNew">Nowość!</span>';
 const getTagLog = (year, rank) => {
     const yearPart = `<span>Rok wydania: ${year}</span>`;
     const rankPart = rank ? `<span>Ostatnia pozycja: ${rank}</span>` : '';
-    return `<div class="chart-item__info tagLog">${yearPart}<br/><br/>${rankPart}</div>`
+    return `<div class="chart-item__info tagLog">${yearPart}<br/><br/>${rankPart}</div>`;
 };
 
-const getArtistInfo = (artist, checked) => {
-    return `<i class="icon mr-4 text-muted fas fa-chevron-down"></i><strong>${artist.name}</strong> - [<span>0</span>/${artist.amount}]`;
+const getGroupInfo = (group, checked) => {
+    return `<i class="icon mr-4 text-muted fas fa-chevron-down"></i><strong>${group.name}</strong> - [<span>0</span>/${group.amount}]`;
 }
 
 let extraTools, amountAll, infoVisible, infoPercent;
@@ -65,7 +79,6 @@ const addInfoStatus = () => {
     extraTools = voteList.querySelector('#extraTools');
 
     amountAll = mainList.length;
-
     extraTools.insertAdjacentHTML('beforeend', setInfoStatus(amountAll));
     const infoStatus = extraTools.querySelector('#infoStatus');
 
@@ -83,7 +96,21 @@ const changeInfoStatus = () => {
         infoPercent.innerText = 0;
     } else {
         const amountPercent = amountVisible / amountAll * 100;
-        infoPercent.innerText = amountPercent.toFixed(0);
+        infoPercent.innerText = Math.floor(amountPercent);
+    }
+}
+
+const setGroups = () => {
+    const dataGroups = loadData('shrinkGroups');
+    if (dataGroups) {
+        dataGroups.forEach(groupId => {
+            dicGroup[groupId].checked = true;
+            dicGroup[groupId].rows.forEach(songIndex => { mainList[songIndex].hidden = true });
+
+            dicGroup[groupId].icon.classList.remove('fa-chevron-down');
+            dicGroup[groupId].icon.classList.add('fa-chevron-right');
+        });
+        changeInfoStatus();
     }
 }
 
@@ -93,24 +120,29 @@ const setCheckboxOnly = (element, rest, dic) => {
         mainList.forEach((item, i) => { item.hidden = !dic[i] && checked });
         rest.forEach(x => { x.checked = false });
 
-        hideArtistGroup(checked);
+        hideGroups(checked);
         changeInfoStatus();
         resetSelectors();
     }
 }
 
-const setCheckboxHide = (element, rest, list, others) => {
+const setCheckboxHide = (element, rest) => {
     element.onclick = (e) => {
         const checked = e.target.checked;
-        const otherChecked = others.some(x => x.checked);
 
-        if (checked && !otherChecked) {
-            mainList.forEach(item => { item.hidden = false });
-        }
+        groupedKeys.forEach(key => { dicGroup[key].checked = checked });
+        groupedSongs.forEach(song => { song.hidden = checked });
+        groupedIcons.forEach(icon => {
+            if (checked) {
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-right');
+            } else {
+                icon.classList.remove('fa-chevron-right');
+                icon.classList.add('fa-chevron-down');
+            }
+        });
 
-        list.forEach(index => { mainList[index].hidden = checked });
-        rest.forEach(x => { x.checked = false });
-
+        changeAllData('shrinkGroups', checked ? groupedKeys : []);
         changeInfoStatus();
         resetSelectors();
     }
@@ -126,6 +158,8 @@ const setOrder = (element, rest, dic) => {
         } else {
             element.checked = true;
         }
+
+        hideGroups(checked);
     }
 }
 
@@ -140,12 +174,12 @@ const addCheckboxes = (setList) => {
     const onlyIsNew = checkboxes1.querySelector("#onlyIsNew");
     const dicIsNew = listIsNew.reduce((dic, key) => ({...dic, [key]: true}), {});
 
-    const checkHideRanked = setCheckHideRanked(listLastP.length);
-    checkboxes1.insertAdjacentHTML('beforeend', checkHideRanked);
-    const hideRanked = checkboxes1.querySelector("#hideRanked");
+    const checkShrinkAll = setCheckShrinkAll(groupedSongKeys.length);
+    checkboxes1.insertAdjacentHTML('beforeend', checkShrinkAll);
+    const shrinkAll = checkboxes1.querySelector("#shrinkAll");
 
-    setCheckboxOnly(onlyIsNew, [hideRanked], dicIsNew);
-    setCheckboxHide(hideRanked, [onlyIsNew], listLastP, []);
+    setCheckboxOnly(onlyIsNew, [shrinkAll], dicIsNew);
+    setCheckboxHide(shrinkAll, [onlyIsNew]);
 
     extraTools.insertAdjacentHTML('beforeend', `<p id="chb2" id="checkboxes"></p>`);
     checkboxes2 = voteList.querySelector("#chb2");
@@ -175,7 +209,6 @@ const addCheckboxes = (setList) => {
 }
 
 const years = { "0": {list:[], name: "NIEPRZYPISANE"} }
-
 const setOptions = (dic) => Object.keys(dic)
     .filter(key => dic[key].list.length)
     .reduce((options, key) => `${options}<option value=${key}>${dic[key].name} (${dic[key].list.length})</option>`, "<option value=''>Wybierz...</option>");
@@ -184,7 +217,7 @@ const setSelector = (element, keys) => {
     element.onchange = (e) => {
         const value = e.target.value;
         mainList.forEach((item, i) => { item.hidden = keys[value] ? !keys[value].list.includes(item.querySelector('input').value) : false });
-        hideArtistGroup(!!value);
+        shrinkAll(!!value);
         changeInfoStatus();
     }
 }
@@ -205,8 +238,10 @@ const addSelectors = (setList) => {
 const resetSelectors = () => selectors.querySelectorAll('select').forEach(select => { select.value = "" });
 
 let voteList, listGroup, mainList, itemList;
-let listIsNew, listLastP, listVoted;
-let artistGroups, dicArtist = {}, dicSong = {};
+let listIsNew, listVoted;
+let dicGroup = {}, dicGroupSong = {};
+let groupedKeys, groupedSongKeys;
+let groupedList, groupedIcons, groupedSongs = [];
 
 const addTags = (setList) => {
     voteList = document.querySelector('.vote-list')
@@ -215,7 +250,7 @@ const addTags = (setList) => {
     itemList = [...mainList];
 
     setList.forEach((item, i) => {
-        const {id, isNew, lastP, year, years, vote, artistId} = item;
+        const {id, isNew, lastP, year, years, vote, groupId} = item;
         const element = mainList[i].querySelector('.vote-item');
         const label = element.querySelector('label');
 
@@ -230,18 +265,23 @@ const addTags = (setList) => {
             element.querySelector('input')?.click();
         }
 
-        if (artistId) {
-            if (dicArtist[artistId]) {
-                dicArtist[artistId].rows.push(i);
+        if (groupId) {
+            const song = mainList[i];
+            if (dicGroup[groupId]) {
+                dicGroup[groupId].rows.push(i);
+                dicGroup[groupId].songs.push(song);
             } else {
-                dicArtist[artistId] = { checked: false, rows: [i] }
+                dicGroup[groupId] = { checked: false, rows: [i], songs: [song] }
             }
-            dicSong[id] = artistId;
+            dicGroupSong[id] = groupId;
+            groupedSongs.push(song);
         }
     });
 
+    groupedKeys = Object.keys(dicGroup);
+    groupedSongKeys = Object.keys(dicGroupSong);
+
     listIsNew = setList.reduce((list, item, i) => item.isNew ? [...list, i] : list, []);
-    listLastP = setList.reduce((list, item, i) => item.lastP ? [...list, i] : list, []);
     listVoted = setList.reduce((list, item, i) => item.votes ? [...list, i] : list, []);
 
     setList.forEach((item, i) => {
@@ -282,7 +322,6 @@ const setSearch = (voteList, items) => {
         author: item.querySelector('.vote-item__author').innerText.toLowerCase(),
         title: item.querySelector('.vote-item__title').innerText.toLowerCase()
     }));
-
     searchCustom.addEventListener('change', (e) => {
         const value = e.target.value.toLowerCase();
         listElement.map(item => {
@@ -291,29 +330,29 @@ const setSearch = (voteList, items) => {
     });
 }
 
-const addArtistGroups = (loading) => {
-    getList(urlArtists).then(artistList => {
-        artistList.forEach(artist => {
-            dicArtist[artist.id].rows.forEach((row, i) => {
+const addGroups = (loading) => {
+    getList(urlGroups).then(groupList => {
+        listGroup.classList.toggle('songGroups');
+        groupList.forEach(group => {
+            dicGroup[group.id].rows.forEach((row, i) => {
                 const button = mainList[row];
-                button.classList.add("artistRow");
+                button.classList.add("gRow");
                 if (i == 0) {
-                    const group = document.createElement('div');
-                    group.id = `g-${artist.id}`;
-                    group.classList.add('artistGroup');
-                    group.insertAdjacentHTML('afterbegin', getArtistInfo(artist, 0));
+                    const groupDiv = document.createElement('div');
+                    groupDiv.id = `g-${group.id}`;
+                    groupDiv.classList.add('gInfo');
+                    groupDiv.insertAdjacentHTML('afterbegin', getGroupInfo(group, 0));
 
-                    group.onclick = (e) => {
+                    groupDiv.onclick = (e) => {
                         const clickedGroup = e.currentTarget;
-                        clickedGroup.classList.toggle("artistEnd");
+                        clickedGroup.classList.toggle("gEnd");
 
-                        const icon = clickedGroup.querySelector('i');
-                        icon.classList.toggle('fa-chevron-right');
-                        icon.classList.toggle('fa-chevron-down');
+                        dicGroup[group.id].icon.classList.toggle('fa-chevron-right');
+                        dicGroup[group.id].icon.classList.toggle('fa-chevron-down');
 
                         let votedCounter = 0;
-                        const checked = dicArtist[artist.id].checked;
-                        dicArtist[artist.id].rows.forEach(rowId => {
+                        const checked = dicGroup[group.id].checked;
+                        dicGroup[group.id].rows.forEach(rowId => {
                             mainList[rowId].hidden = !checked;
 
                             const input = mainList[rowId].querySelector('input[type="checkbox"]');
@@ -322,24 +361,26 @@ const addArtistGroups = (loading) => {
                                 votedCounter++;
                             }
                         });
-                        dicArtist[artist.id].checked = !checked;
+                        dicGroup[group.id].checked = !checked;
 
                         const votedValue = clickedGroup.querySelector('span');
                         votedValue.textContent = votedCounter;
+                        changeData('shrinkGroups', group.id, checked);
                         changeInfoStatus();
                     }
-                    listGroup.insertBefore(group, button);
-                } else if (i == artist.amount-1) {
-                    button.classList.add("artistEnd");
+                    listGroup.insertBefore(groupDiv, button);
+                    dicGroup[group.id].icon = groupDiv.firstChild;
+                } else if (i == group.amount-1) {
+                    button.classList.add("gEnd");
                 }
 
                 const input = mainList[row].querySelector('input[type="checkbox"]');
                 input.onclick = (e) => {
                     const checked = e.target.checked;
                     const songId = e.target.value;
-                    const id = dicSong[songId];
-                    const group = listGroup.querySelector(`div#g-${id}`);
-                    const votedValue = group.querySelector('span');
+                    const id = dicGroupSong[songId];
+                    const groupDiv = listGroup.querySelector(`div#g-${id}`);
+                    const votedValue = groupDiv.querySelector('span');
                     if (checked) {
                         votedValue.textContent++;
                     } else {
@@ -348,14 +389,23 @@ const addArtistGroups = (loading) => {
                 }
             });
         });
-        artistGroups = listGroup.querySelectorAll("div.artistGroup");
+        groupedList = listGroup.querySelectorAll("div.gInfo");
+        groupedIcons = listGroup.querySelectorAll("i");
+        setGroups();
         loading.hidden = true;
         toggleVisibility(voteList);
     });
 }
 
-const hideArtistGroup = (state) => {
-    artistGroups.forEach(group => { group.hidden = state });
+const hideGroups = (state) => {
+    groupedList.forEach(group => { group.hidden = state });
+
+    if (state) {
+        listGroup.classList.remove('songGroups');
+    } else {
+        listGroup.classList.add('songGroups');
+        setGroups();
+    }
 }
 
 const getVotes = (setList) => {
@@ -471,7 +521,7 @@ const setVoteSection = () => {
                         showScroll(true);
                         addTags(setList);
                         setVoteSection();
-                        addArtistGroups(loading);
+                        addGroups(loading);
                     }
                 }
             }
