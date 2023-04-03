@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.3.4
+// @version      0.4.0
 // @author       cuberut
 // @description  Wspomaganie głosowania
-// @match        https://lista.radio357.pl/app/top/glosowanie
+// @match        https://top.radio357.pl/app/polski-top/glosowanie
 // @updateURL    https://raw.githubusercontent.com/cuberut/top357plus/main/top357plus.js
 // @downloadURL  https://raw.githubusercontent.com/cuberut/top357plus/main/top357plus.js
 // @grant        GM_addStyle
@@ -23,7 +23,7 @@ GM_addStyle("ul.songGroups .gInfo { border-width: 1px 3px; border-color: #bbb; b
 GM_addStyle("ul.songGroups .gRow { border-width: 0px 3px 1px; }");
 GM_addStyle("ul.songGroups .gEnd { border-bottom-width: 3px; }");
 
-const urlApi = 'https://opensheet.elk.sh/1GxtFKaVifd9lTDNCjB65BFSqUl7L6SIprK9OwxZCUno';
+const urlApi = 'https://opensheet.elk.sh/1kvUoOTlkVjUboDZVAMPhbIsXbLboIj44hoQi3caJuwc';
 const urlSettings = `${urlApi}/settings`;
 const urlGroups = `${urlApi}/groups`;
 
@@ -56,9 +56,9 @@ const setSelectByYears = () => `<label class="form-check-label">Pokaż tylko utw
 
 const tagNew = '<span class="badge badge-primary tagNew">Nowość!</span>';
 
-const getTagLog = (year, rank) => {
-    const yearPart = `<span>Rok wydania: ${year}</span>`;
-    const rankPart = rank ? `<span>Ostatnia pozycja: ${rank}</span>` : '';
+const getTagLog = (year, rank, change) => {
+    const yearPart = `<span>rok wydania: ${year}</span>`;
+    const rankPart = rank ? `<span>ostatnia poz.: ${rank}` + (change ? ` (${change})` : '') + `</span>` : '';
     return `<div class="chart-item__info tagLog">${yearPart}<br/><br/>${rankPart}</div>`;
 };
 
@@ -206,7 +206,7 @@ const addTags = (setList) => {
     itemList = [...mainList];
 
     setList.forEach((item, i) => {
-        const {id, isNew, lastP, year, years, vote, groupId} = item;
+        const {id, isNew, rank, change, year, years, vote, groupId} = item;
         const element = mainList[i].querySelector('.vote-item');
         const label = element.querySelector('label');
 
@@ -214,7 +214,7 @@ const addTags = (setList) => {
             label.insertAdjacentHTML('afterend', tagNew);
         }
 
-        const tagYear = getTagLog(year, lastP);
+        const tagYear = getTagLog(year, rank, change);
         element.insertAdjacentHTML('beforeend', tagYear);
 
         if (vote) {
@@ -453,7 +453,7 @@ const setVoteSection = () => {
                 getVotes(setList);
                 setVotes();
 
-                voteList.insertAdjacentHTML('beforebegin', `<div id="loadbar"><div id="loading">Zaczytywanie danych...</div></div>`);
+                voteList.insertAdjacentHTML('beforebegin', `<div id="loadbar"><div id="loading">Zaczytywanie danych..</div></div>`);
                 loading = voteList.parentElement.querySelector("#loading");
             }
 
