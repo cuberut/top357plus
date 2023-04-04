@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.4.0
+// @version      0.4.1
 // @author       cuberut
 // @description  Wspomaganie głosowania
 // @match        https://top.radio357.pl/app/polski-top/glosowanie
@@ -194,7 +194,7 @@ const addSelectors = (setList) => {
 const resetSelectors = () => selectors.querySelectorAll('select').forEach(select => { select.value = "" });
 
 let voteList, listGroup, mainList, itemList;
-let listIsNew, listVoted;
+let listIsNew, listVoted, votedList;;
 let dicGroup = {}, dicGroupSong = {};
 let groupedKeys, groupedSongKeys;
 let groupedList, groupedIcons, groupedSongs = [];
@@ -387,12 +387,8 @@ const setVotes = () => {
         const voteButton = voteContent.querySelector('button');
         voteButton.addEventListener('click', (e) => {
             extraTools.hidden = true;
-
-            const voteList = document.querySelector('.vote-list');
-            const votedItems = [...voteList.querySelectorAll('.vote-item input:checked')];
-            const votedList = votedItems.map(elem => +elem.value);
-
-            localStorage.setItem("myTopVotes", JSON.stringify(votedList));
+            hideGroups(true);
+            votedList.hidden = true;
         });
     }
 }
@@ -402,7 +398,7 @@ const setVoteSection = () => {
 
     if (voteSection) {
         voteSection.insertAdjacentHTML('beforeend', `<div id="votedList"><ol></ol></div>`);
-        const votedList = voteSection.querySelector('#votedList ol');
+        votedList = voteSection.querySelector('#votedList ol');
 
         const voteCounter = voteSection.querySelector('.vote__votes');
         voteCounter.addEventListener("DOMSubtreeModified", (e) => {
@@ -416,6 +412,14 @@ const setVoteSection = () => {
 
             votedList.textContent = null
             votedList.insertAdjacentHTML('beforeend', list);
+
+            votedList.addEventListener("DOMSubtreeModified", (e) => {
+                const voteList = document.querySelector('.vote-list');
+                const votedItems = [...voteList.querySelectorAll('.vote-item input:checked')];
+                const votedList = votedItems.map(elem => +elem.value);
+
+                localStorage.setItem("myTopVotes", JSON.stringify(votedList));
+            });
 
             const votedItems = [...voteSection.querySelectorAll('li')];
             votedItems.forEach(li => {
