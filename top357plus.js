@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.4.1
+// @version      0.5
 // @author       cuberut
 // @description  Wspomaganie głosowania
-// @match        https://top.radio357.pl/app/polski-top/glosowanie
+// @match        https://glosuj.radio357.pl/app/top/glosowanie
 // @updateURL    https://raw.githubusercontent.com/cuberut/top357plus/main/top357plus.js
 // @downloadURL  https://raw.githubusercontent.com/cuberut/top357plus/main/top357plus.js
 // @grant        GM_addStyle
@@ -23,7 +23,7 @@ GM_addStyle("ul.songGroups .gInfo { border-width: 1px 3px; border-color: #bbb; b
 GM_addStyle("ul.songGroups .gRow { border-width: 0px 3px 1px; }");
 GM_addStyle("ul.songGroups .gEnd { border-bottom-width: 3px; }");
 
-const urlApi = 'https://opensheet.elk.sh/1kvUoOTlkVjUboDZVAMPhbIsXbLboIj44hoQi3caJuwc';
+const urlApi = 'https://opensheet.elk.sh/1qAw-0i_m90smGcdvAcvHFhSH27gF5eDbgR6EM5SLx34';
 const urlSettings = `${urlApi}/settings`;
 const urlGroups = `${urlApi}/groups`;
 
