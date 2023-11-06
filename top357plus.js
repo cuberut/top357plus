@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.5
+// @version      0.5.1
 // @author       cuberut
 // @description  Wspomaganie głosowania
 // @match        https://glosuj.radio357.pl/app/top/glosowanie
@@ -457,7 +457,7 @@ const setVoteSection = () => {
                 getVotes(setList);
                 setVotes();
 
-                voteList.insertAdjacentHTML('beforebegin', `<div id="loadbar"><div id="loading">Zaczytywanie danych..</div></div>`);
+                voteList.insertAdjacentHTML('beforebegin', `<div id="loadbar"><div id="loading">Zaczytywanie danych...</div></div>`);
                 loading = voteList.parentElement.querySelector("#loading");
             }
 
