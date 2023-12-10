@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.5.1
+// @version      0.6
 // @author       cuberut
 // @description  Wspomaganie głosowania
 // @match        https://glosuj.radio357.pl/app/top/glosowanie
@@ -9,8 +9,6 @@
 // @grant        GM_addStyle
 // ==/UserScript==
 
-GM_addStyle("div#loadbar { width: 100%; background-color: #ddd;}");
-GM_addStyle("div#loading { width: 0%; height: 2rem; background-color: #337AB7; padding: 0.25rem 0.5rem; }");
 GM_addStyle("div.tagNew { position: absolute; right: 0; margin-right: 100px; }");
 GM_addStyle("div.tagLog { width: 110px; position: absolute; right: 0; margin-right: 60px; text-align: left; }");
 GM_addStyle("div#extraTools label, div#extraTools select { display: inline-block; width: 50%; }");
@@ -63,7 +61,7 @@ const getTagLog = (year, rank, change) => {
 };
 
 const getGroupInfo = (group, checked) => {
-    return `<i class="icon mr-4 text-muted fas fa-chevron-down"></i><strong>${group.name}</strong> - [<span>0</span>/${group.amount}]`;
+    return `<i class="icon mr-4 text-muted fas fa-chevron-down"></i><strong>${group.name}</strong> - [<span>${group.counter}</span>/${group.amount}]`;
 }
 
 let extraTools, amountAll, infoVisible, infoPercent;
@@ -261,9 +259,6 @@ const addTags = (setList) => {
     addSelectors(setList);
 }
 
-const showScroll = (state) => { document.body.style.overflow = state ? 'auto' : 'hidden' }
-const toggleVisibility = (element) => { element.style.opacity = (element.style.opacity === '') ? 0 : '' }
-
 const setSearch = (voteList, items) => {
     const searchSection = voteList.querySelector('.vote-list__search');
 
@@ -278,6 +273,7 @@ const setSearch = (voteList, items) => {
         author: item.querySelector('.vote-item__author').innerText.toLowerCase(),
         title: item.querySelector('.vote-item__title').innerText.toLowerCase()
     }));
+
     searchCustom.addEventListener('change', (e) => {
         const value = e.target.value.toLowerCase();
         hideGroups(!!value);
@@ -292,7 +288,7 @@ const setSearch = (voteList, items) => {
     });
 }
 
-const addGroups = (loading) => {
+const addGroups = () => {
     getList(urlGroups).then(groupList => {
         listGroup.classList.toggle('songGroups');
         groupList.forEach(group => {
@@ -300,6 +296,11 @@ const addGroups = (loading) => {
                 const button = mainList[row];
                 button.classList.add("gRow");
                 if (i == 0) {
+                    group.counter = dicGroup[group.id].songs.reduce((sum, item) => {
+                        sum += +item.querySelector('input[type="checkbox"]').checked;
+                        return sum;
+                    }, 0);
+
                     const groupDiv = document.createElement('div');
                     groupDiv.id = `g-${group.id}`;
                     groupDiv.classList.add('gInfo');
@@ -354,8 +355,6 @@ const addGroups = (loading) => {
         groupedList = listGroup.querySelectorAll("div.gInfo");
         groupedIcons = listGroup.querySelectorAll("i");
         setGroups();
-        loading.hidden = true;
-        toggleVisibility(voteList);
     });
 }
 
@@ -370,126 +369,73 @@ const hideGroups = (state) => {
     }
 }
 
-const getVotes = (setList) => {
-    const myVotes = {};
-    const votes = JSON.parse(localStorage.getItem("myTopVotes"));
+const setVotedList = (votedList) => {
+    const checkedItems = voteList.querySelectorAll('ul.list-group input[type="checkbox"]:checked');
+    const list = [...checkedItems].reduce((list, item) => {
+        const id = item.id;
+        const songElement = item.parentElement.querySelector('label');
+        const songValue = songElement.innerText.replace("\n", " - ");
 
-    if (votes) {
-        votes.forEach(id => { myVotes[id] = true });
-        setList.forEach(item => { item.vote = myVotes[item.id] });
-    }
-}
+        return `${list}<li for="${id}">${songValue}</li>`;
+    }, "");
 
-const setVotes = () => {
-    const voteContent = document.querySelector('.vote__content');
+    votedList.textContent = null
+    votedList.insertAdjacentHTML('beforeend', list);
 
-    if (voteContent) {
-        const voteButton = voteContent.querySelector('button');
-        voteButton.addEventListener('click', (e) => {
-            extraTools.hidden = true;
-            hideGroups(true);
-            votedList.hidden = true;
+    const votedItems = [...votedList.querySelectorAll('li')];
+    votedItems.forEach(li => {
+        li.addEventListener("click", (e) => {
+            const forId = e.target.getAttribute("for");
+            const input = voteList.querySelector(`#${forId}`);
+            input.click();
         });
-    }
+    });
 }
 
-const setVoteSection = () => {
+const setVoteSection = (voteList) => {
     const voteSection = document.querySelector('.layout__action');
 
     if (voteSection) {
         voteSection.insertAdjacentHTML('beforeend', `<div id="votedList"><ol></ol></div>`);
         votedList = voteSection.querySelector('#votedList ol');
 
+        setVotedList(votedList);
+
         const voteCounter = voteSection.querySelector('.vote__votes');
-        voteCounter.addEventListener("DOMSubtreeModified", (e) => {
-            const checkedItems = voteList.querySelectorAll('ul.list-group input[type="checkbox"]:checked')
-            const list = [...checkedItems].reduce((list, item) => {
-                const id = item.id;
-                const songElement = item.parentElement.querySelector('label');
-                const songValue = songElement.innerText.replace("\n", " - ");
-                return `${list}<li for="${id}">${songValue}</li>`;
-            }, "");
 
-            votedList.textContent = null
-            votedList.insertAdjacentHTML('beforeend', list);
-
-            votedList.addEventListener("DOMSubtreeModified", (e) => {
-                const voteList = document.querySelector('.vote-list');
-                const votedItems = [...voteList.querySelectorAll('.vote-item input:checked')];
-                const votedList = votedItems.map(elem => +elem.value);
-
-                localStorage.setItem("myTopVotes", JSON.stringify(votedList));
+        const counterObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'characterData') {
+                    setVotedList(votedList);
+                }
             });
+        });
 
-            const votedItems = [...voteSection.querySelectorAll('li')];
-            votedItems.forEach(li => {
-                li.addEventListener("click", (e) => {
-                    const forId = e.target.getAttribute("for");
-                    const input = voteList.querySelector(`#${forId}`);
-                    input.click();
-                });
-            });
-        }, false);
+        const counterConfig = { characterData: true, subtree: true };
+
+        counterObserver.observe(voteCounter, counterConfig);
     }
 }
 
 (function() {
-    showScroll(false);
-
     getList(urlSettings).then(setList => {
-        const setCounter = setList.length;
-
-        let voteList, listNo;
-        let loadbar, loading, progress;
+        let voteList;
         let items = [];
-        let itemsCounter = 0;
-        let visible;
 
         const interval = setInterval(() => {
             if (!voteList) {
                 voteList = document.querySelector('.vote-list');
-            }
 
-            if (voteList && !loading) {
-                toggleVisibility(voteList);
+            } else {
+                clearInterval(interval);
 
-                listNo = document.querySelector('.header__heading-voting').innerText.split('#')[1];
-                getVotes(setList);
-                setVotes();
+                items = [...voteList.querySelectorAll('.list-group-item:not([hidden])')];
 
-                voteList.insertAdjacentHTML('beforebegin', `<div id="loadbar"><div id="loading">Zaczytywanie danych...</div></div>`);
-                loading = voteList.parentElement.querySelector("#loading");
-            }
+                setSearch(voteList, items);
+                addTags(setList);
+                addGroups();
 
-            if (loading) {
-                visible = voteList.querySelectorAll('.list-group-item:not([hidden])');
-
-                if (visible.length || itemsCounter == setCounter) {
-                    setTimeout(function(){
-                        visible.forEach(item => {
-                            item.hidden = true;
-
-                            if (!item.counted) {
-                                itemsCounter++;
-                                item.counted = true;
-                            }
-                        });
-                    }, 0);
-
-                    items = [...items, ...visible];
-                    progress = (itemsCounter/setCounter) * 100;
-                    loading.style.width = progress + '%';
-
-                    if (itemsCounter == setCounter) {
-                        setSearch(voteList, items);
-                        clearInterval(interval);
-                        items.forEach(item => { item.hidden = false });
-                        showScroll(true);
-                        addTags(setList);
-                        setVoteSection();
-                        addGroups(loading);
-                    }
-                }
+                setVoteSection(voteList);
             }
         }, 25);
     });
