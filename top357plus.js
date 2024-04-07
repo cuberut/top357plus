@@ -1,13 +1,20 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.6
+// @version      0.7
 // @author       cuberut
 // @description  Wspomaganie głosowania
-// @match        https://glosuj.radio357.pl/app/top/glosowanie
+// @match        https://glosuj.radio357.pl/app/polski-top/glosowanie
 // @updateURL    https://raw.githubusercontent.com/cuberut/top357plus/main/top357plus.js
 // @downloadURL  https://raw.githubusercontent.com/cuberut/top357plus/main/top357plus.js
+// @require      https://cdn.jsdelivr.net/chartist.js/latest/chartist.min.js
+// @resource     REMOTE_CSS https://cdn.jsdelivr.net/chartist.js/latest/chartist.min.css
 // @grant        GM_addStyle
+// @grant        GM_getResourceText
 // ==/UserScript==
+
+const myCss = GM_getResourceText("REMOTE_CSS");
+GM_addStyle(myCss);
+GM_addStyle("div.ct-chart g.ct-grids line[y1='330'] { stroke-dasharray: 8; stroke-width: 2; }");
 
 GM_addStyle("div.tagNew { position: absolute; right: 0; margin-right: 100px; }");
 GM_addStyle("div.tagLog { width: 110px; position: absolute; right: 0; margin-right: 60px; text-align: left; }");
@@ -21,9 +28,11 @@ GM_addStyle("ul.songGroups .gInfo { border-width: 1px 3px; border-color: #bbb; b
 GM_addStyle("ul.songGroups .gRow { border-width: 0px 3px 1px; }");
 GM_addStyle("ul.songGroups .gEnd { border-bottom-width: 3px; }");
 
-const urlApi = 'https://opensheet.elk.sh/1qAw-0i_m90smGcdvAcvHFhSH27gF5eDbgR6EM5SLx34';
+const urlApi = 'https://opensheet.elk.sh/1c7ipDDGpVvFlFQXvZ4SEyO9ESeI_VjfqNju4D9UDesc/';
 const urlSettings = `${urlApi}/settings`;
 const urlGroups = `${urlApi}/groups`;
+
+const storageName = 'shrinkGroups2024PL';
 
 const getList = async (url) => {
     const response = await fetch(url);
@@ -93,7 +102,7 @@ const changeInfoStatus = () => {
 }
 
 const setGroups = () => {
-    const dataGroups = loadData('shrinkGroups');
+    const dataGroups = loadData(storageName);
     if (dataGroups) {
         dataGroups.forEach(groupId => {
             dicGroup[groupId].checked = true;
@@ -134,7 +143,7 @@ const setCheckboxHide = (element, rest) => {
             }
         });
 
-        changeAllData('shrinkGroups', checked ? groupedKeys : []);
+        changeAllData(storageName, checked ? groupedKeys : []);
         changeInfoStatus();
         resetSelectors();
     }
@@ -197,14 +206,18 @@ let dicGroup = {}, dicGroupSong = {};
 let groupedKeys, groupedSongKeys;
 let groupedList, groupedIcons, groupedSongs = [];
 
-const addTags = (setList) => {
+const addTags = (listNo, setList) => {
     voteList = document.querySelector('.vote-list')
     listGroup = voteList.querySelector('ul.list-group');
     mainList = voteList.querySelectorAll(".list-group-item");
     itemList = [...mainList];
 
+    const layoutRight = document.querySelector('div[slug="polski-top"] .layout__right-column .layout__photo');
+    layoutRight.style.right = "auto";
+    const layoutPhoto = layoutRight.querySelector('div');
+
     setList.forEach((item, i) => {
-        const {id, isNew, rank, change, year, years, vote, groupId} = item;
+        const {id, isNew, rank, change, year, years, vote, groupId, history} = item;
         const element = mainList[i].querySelector('.vote-item');
         const label = element.querySelector('label');
 
@@ -217,6 +230,32 @@ const addTags = (setList) => {
 
         if (vote) {
             element.querySelector('input')?.click();
+        }
+
+        if (history) {
+            layoutRight.insertAdjacentHTML('afterbegin', `<div id="chart-${i}" class="ct-chart" hidden></div>`);
+            const chart = layoutRight.querySelector(`#chart-${i}`);
+            mainList[i].addEventListener('mouseover', (e) => { chart.hidden = false; layoutPhoto.hidden = true });
+            mainList[i].addEventListener('mouseout', (e) => { chart.hidden = true; layoutPhoto.hidden = false });
+
+            const labels = [...Array(listNo-1).keys()].map(x => (x + 2021));
+            const series = history.split(",").map(x => -x || null);
+
+            new window.Chartist.Line(chart, {
+                labels: labels,
+                series: [ series ]
+            }, {
+                height: '500px',
+                width: '550px',
+                fullWidth: false,
+                fillHoles: false,
+                axisY: {
+                    low: -375,
+                    high: -1,
+                    onlyInteger: true,
+                    labelInterpolationFnc: value => -value
+                }
+            });
         }
 
         if (groupId) {
@@ -328,7 +367,7 @@ const addGroups = () => {
 
                         const votedValue = clickedGroup.querySelector('span');
                         votedValue.textContent = votedCounter;
-                        changeData('shrinkGroups', group.id, checked);
+                        changeData(storageName, group.id, checked);
                         changeInfoStatus();
                     }
                     listGroup.insertBefore(groupDiv, button);
@@ -419,7 +458,7 @@ const setVoteSection = (voteList) => {
 
 (function() {
     getList(urlSettings).then(setList => {
-        let voteList;
+        let voteList, listNo;
         let items = [];
 
         const interval = setInterval(() => {
@@ -427,12 +466,14 @@ const setVoteSection = (voteList) => {
                 voteList = document.querySelector('.vote-list');
 
             } else {
+                listNo = +document.querySelector('.header__heading-voting').innerText.split('#')[1];
+
                 clearInterval(interval);
 
                 items = [...voteList.querySelectorAll('.list-group-item:not([hidden])')];
 
                 setSearch(voteList, items);
-                addTags(setList);
+                addTags(listNo, setList);
                 addGroups();
 
                 setVoteSection(voteList);
