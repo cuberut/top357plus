@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.8
+// @version      0.8.1
 // @author       cuberut
 // @description  Wspomaganie głosowania
 // @match        https://glosuj.radio357.pl/app/top/glosowanie
@@ -15,6 +15,8 @@
 const myCss = GM_getResourceText("REMOTE_CSS");
 GM_addStyle(myCss);
 GM_addStyle("div.ct-chart g.ct-grids line[y1='330'] { stroke-dasharray: 8; stroke-width: 2; }");
+GM_addStyle("div.ct-chart g.ct-series-a .ct-line { stroke: #f95f1f }");
+GM_addStyle("div.ct-chart g.ct-series-a .ct-point { stroke: #f95f1f; fill: #f95f1f; }");
 
 GM_addStyle("div.tagNew { position: absolute; right: 0; margin-right: 100px; }");
 GM_addStyle("div.tagLog { width: 110px; position: absolute; right: 0; margin-right: 60px; text-align: left; }");
@@ -56,8 +58,8 @@ const changeAllData = (key, list) => {
 
 const setInfoStatus = (amount) => `<p id="infoStatus">Liczba widocznych utworów: <strong><span id="infoVisible">${amount}</span>/<span>${amount}</span></strong> (<span id="infoPercent">100</span>%)`;
 
-const setCheckOnlyIsNew = (amount) => `<label class="form-check-label"><input id="onlyIsNew" type="checkbox" ${amount || 'disabled'}><span>Pokaż tylko nowości - ${amount} pozycji</span></label>`;
-const setCheckShrinkAll = (amount) => `<label class="form-check-label"><input id="shrinkAll" type="checkbox" ${amount || 'disabled'}><span>Zwiń wszystkie grupy - ${amount} pozycji</span></label>`;
+const setCheckOnlyIsNew = (amount) => `<span><input id="onlyIsNew" type="checkbox" class="custom-check custom-checkbox" ${amount || 'disabled'}><label for="onlyIsNew"><span>Pokaż tylko nowości - ${amount} pozycji</span></label></span>`;
+const setCheckShrinkAll = (amount) => `<span><input id="shrinkAll" type="checkbox" class="custom-check custom-checkbox" ${amount || 'disabled'}><label for="shrinkAll"><span>Zwiń wszystkie grupy - ${amount} pozycji</span></label></span>`;
 
 const setSelectByYears = () => `<label class="form-check-label">Pokaż tylko utwory z lat:</label><select id="chooseByYears"></select>`;
 
