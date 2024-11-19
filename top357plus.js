@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.8.1
+// @version      0.8.2
 // @author       cuberut
 // @description  Wspomaganie głosowania
 // @match        https://glosuj.radio357.pl/app/top/glosowanie
@@ -202,7 +202,7 @@ const addSelectors = (setList) => {
 
 const resetSelectors = () => selectors.querySelectorAll('select').forEach(select => { select.value = "" });
 
-let voteList, listGroup, mainList, itemList;
+let voteList, listGroup, mainList, itemDict;
 let listIsNew, listVoted, votedList;;
 let dicGroup = {}, dicGroupSong = {};
 let groupedKeys, groupedSongKeys;
@@ -211,8 +211,11 @@ let groupedList, groupedIcons, groupedSongs = [];
 const addTags = (listNo, setList) => {
     voteList = document.querySelector('.vote-list')
     listGroup = voteList.querySelector('ul.list-group');
-    mainList = voteList.querySelectorAll(".list-group-item");
-    itemList = [...mainList];
+    mainList = [...voteList.querySelectorAll(".list-group-item")];
+    itemDict = mainList.reduce((itemDict, button) => ({
+        ...itemDict,
+        [button.getAttribute('data-vote-id')]: button
+    }), []);
 
     const layoutRight = document.querySelector('div[slug="top"] .layout__right-column .layout__photo');
     layoutRight.style.right = "auto";
@@ -220,7 +223,8 @@ const addTags = (listNo, setList) => {
 
     setList.forEach((item, i) => {
         const {id, isNew, rank, change, year, years, vote, groupId, history} = item;
-        const element = mainList[i].querySelector('.vote-item');
+        const button = itemDict[id];
+        const element = button.querySelector('.vote-item');
         const label = element.querySelector('label');
 
         if (isNew) {
@@ -237,8 +241,8 @@ const addTags = (listNo, setList) => {
         if (history) {
             layoutRight.insertAdjacentHTML('afterbegin', `<div id="chart-${i}" class="ct-chart" hidden></div>`);
             const chart = layoutRight.querySelector(`#chart-${i}`);
-            mainList[i].addEventListener('mouseover', (e) => { chart.hidden = false; layoutPhoto.hidden = true });
-            mainList[i].addEventListener('mouseout', (e) => { chart.hidden = true; layoutPhoto.hidden = false });
+            button.addEventListener('mouseover', (e) => { chart.hidden = false; layoutPhoto.hidden = true });
+            button.addEventListener('mouseout', (e) => { chart.hidden = true; layoutPhoto.hidden = false });
 
             const labels = [...Array(listNo-1).keys()].map(x => (x + 2021));
             const series = history.split(",").map(x => -x || null);
