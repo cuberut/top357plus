@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.8.2
+// @version      0.8.3
 // @author       cuberut
 // @description  Wspomaganie głosowania
 // @match        https://glosuj.radio357.pl/app/top/glosowanie
@@ -120,7 +120,7 @@ const setGroups = () => {
 const setCheckboxOnly = (element, rest, dic) => {
     element.onclick = (e) => {
         const checked = e.target.checked;
-        mainList.forEach((item, i) => { item.hidden = !dic[i] && checked });
+        Object.entries(itemDict).forEach(([id, item]) => { item.hidden = !dic[id] && checked });
         rest.forEach(x => { x.checked = false });
 
         hideGroups(checked);
@@ -280,8 +280,8 @@ const addTags = (listNo, setList) => {
     groupedKeys = Object.keys(dicGroup);
     groupedSongKeys = Object.keys(dicGroupSong);
 
-    listIsNew = setList.reduce((list, item, i) => item.isNew ? [...list, i] : list, []);
-    listVoted = setList.reduce((list, item, i) => item.votes ? [...list, i] : list, []);
+    listIsNew = setList.reduce((list, item) => item.isNew ? [...list, item.id] : list, []);
+    listVoted = setList.reduce((list, item) => item.votes ? [...list, item.id] : list, []);
 
     setList.forEach((item, i) => {
         if (!item.years) {
