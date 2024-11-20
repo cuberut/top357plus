@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.8.3
+// @version      0.8.4
 // @author       cuberut
 // @description  Wspomaganie głosowania
 // @match        https://glosuj.radio357.pl/app/top/glosowanie
@@ -14,6 +14,7 @@
 
 const myCss = GM_getResourceText("REMOTE_CSS");
 GM_addStyle(myCss);
+GM_addStyle("div.ct-chart { background-color: white; opacity: 95% }");
 GM_addStyle("div.ct-chart g.ct-grids line[y1='330'] { stroke-dasharray: 8; stroke-width: 2; }");
 GM_addStyle("div.ct-chart g.ct-series-a .ct-line { stroke: #f95f1f }");
 GM_addStyle("div.ct-chart g.ct-series-a .ct-point { stroke: #f95f1f; fill: #f95f1f; }");
@@ -23,6 +24,7 @@ GM_addStyle("div.tagLog { width: 110px; position: absolute; right: 0; margin-rig
 GM_addStyle("div#extraTools label, div#extraTools select { display: inline-block; width: 50%; }");
 GM_addStyle("div#extraTools #selectors { width: 50%; padding-right: 1em }");
 GM_addStyle("span#infoVisible { display: inline-block; text-align: right; width: 40px; }");
+GM_addStyle("div#averageYear { margin: 0px -20px 10px }");
 GM_addStyle("div#votes { position: absolute; left: 10px; width: auto; text-align: center; }");
 GM_addStyle("div#votedList ol { font-size: small; padding-left: 1.5em; margin-top: 1em; }");
 GM_addStyle("div#votedList ol li:hover { text-decoration: line-through; cursor: pointer; }");
@@ -204,7 +206,7 @@ const resetSelectors = () => selectors.querySelectorAll('select').forEach(select
 
 let voteList, listGroup, mainList, itemDict;
 let listIsNew, listVoted, votedList;;
-let dicGroup = {}, dicGroupSong = {};
+let dicYear = {}, dicGroup = {}, dicGroupSong = {};
 let groupedKeys, groupedSongKeys;
 let groupedList, groupedIcons, groupedSongs = [];
 
@@ -217,9 +219,15 @@ const addTags = (listNo, setList) => {
         [button.getAttribute('data-vote-id')]: button
     }), []);
 
+    dicYear = setList.reduce((dic, item) => ({
+        ...dic,
+        [item.id]: +item.year
+    }), []);
+
     const layoutRight = document.querySelector('div[slug="top"] .layout__right-column .layout__photo');
     layoutRight.style.right = "auto";
     const layoutPhoto = layoutRight.querySelector('div');
+    layoutPhoto.remove();
 
     setList.forEach((item, i) => {
         const {id, isNew, rank, change, year, years, vote, groupId, history} = item;
@@ -241,10 +249,10 @@ const addTags = (listNo, setList) => {
         if (history) {
             layoutRight.insertAdjacentHTML('afterbegin', `<div id="chart-${i}" class="ct-chart" hidden></div>`);
             const chart = layoutRight.querySelector(`#chart-${i}`);
-            button.addEventListener('mouseover', (e) => { chart.hidden = false; layoutPhoto.hidden = true });
-            button.addEventListener('mouseout', (e) => { chart.hidden = true; layoutPhoto.hidden = false });
+            button.addEventListener('mouseover', (e) => { chart.hidden = false });
+            button.addEventListener('mouseout', (e) => { chart.hidden = true });
 
-            const labels = [...Array(listNo-1).keys()].map(x => (x + 2021));
+            const labels = [...Array(listNo-1).keys()].map(x => (x + 2022));
             const series = history.split(",").map(x => -x || null);
 
             new window.Chartist.Line(chart, {
@@ -414,15 +422,20 @@ const hideGroups = (state) => {
     }
 }
 
-const setVotedList = (votedList) => {
-    const checkedItems = voteList.querySelectorAll('ul.list-group input[type="checkbox"]:checked');
-    const list = [...checkedItems].reduce((list, item) => {
-        const id = item.id;
+const setVotedList = (votedList, votedYear, setList) => {
+    const checkedItems = [...voteList.querySelectorAll('ul.list-group input[type="checkbox"]:checked')];
+
+    const list = checkedItems.reduce((list, item) => {
+        const vid = item.id;
         const songElement = item.parentElement.querySelector('label');
         const songValue = songElement.innerText.replace("\n", " - ");
 
-        return `${list}<li for="${id}">${songValue}</li>`;
+        return `${list}<li for="${vid}">${songValue}</li>`;
     }, "");
+
+    const selectedIds = checkedItems.map(item => item._value);
+    const averageYear = selectedIds.reduce((acc, id) => acc + dicYear[id], 0) / selectedIds.length || 0;
+    votedYear.innerText = averageYear.toFixed(0);
 
     votedList.textContent = null
     votedList.insertAdjacentHTML('beforeend', list);
@@ -437,21 +450,30 @@ const setVotedList = (votedList) => {
     });
 }
 
-const setVoteSection = (voteList) => {
+const setVoteSection = (voteList, setList) => {
     const voteSection = document.querySelector('.layout__action');
+    voteSection.style.zIndex = 'auto';
 
     if (voteSection) {
+        const cardBody = voteSection.querySelector('.card-body');
+
+        const button = cardBody.querySelector('button');
+        button.classList.remove('mb-lg-4');
+
+        button.insertAdjacentHTML('beforebegin', `<div id="averageYear"><span class="vote__text">Średni rok wydania: </span><strong class="vote__year"></strong></div>`);
+        const votedYear = cardBody.querySelector('strong.vote__year');
+
         voteSection.insertAdjacentHTML('beforeend', `<div id="votedList"><ol></ol></div>`);
         votedList = voteSection.querySelector('#votedList ol');
 
-        setVotedList(votedList);
+        setVotedList(votedList, votedYear, setList);
 
         const voteCounter = voteSection.querySelector('.vote__votes');
 
         const counterObserver = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 if (mutation.type === 'characterData') {
-                    setVotedList(votedList);
+                    setVotedList(votedList, votedYear, setList);
                 }
             });
         });
@@ -482,7 +504,7 @@ const setVoteSection = (voteList) => {
                 addTags(listNo, setList);
                 addGroups();
 
-                setVoteSection(voteList);
+                setVoteSection(voteList, setList);
             }
         }, 25);
     });
