@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.8.4
+// @version      0.8.5
 // @author       cuberut
 // @description  Wspomaganie głosowania
 // @match        https://glosuj.radio357.pl/app/top/glosowanie
@@ -18,11 +18,11 @@ GM_addStyle("div.ct-chart { background-color: white; opacity: 95% }");
 GM_addStyle("div.ct-chart g.ct-grids line[y1='330'] { stroke-dasharray: 8; stroke-width: 2; }");
 GM_addStyle("div.ct-chart g.ct-series-a .ct-line { stroke: #f95f1f }");
 GM_addStyle("div.ct-chart g.ct-series-a .ct-point { stroke: #f95f1f; fill: #f95f1f; }");
-
 GM_addStyle("div.tagNew { position: absolute; right: 0; margin-right: 100px; }");
 GM_addStyle("div.tagLog { width: 110px; position: absolute; right: 0; margin-right: 60px; text-align: left; }");
-GM_addStyle("div#extraTools label, div#extraTools select { display: inline-block; width: 50%; }");
-GM_addStyle("div#extraTools #selectors { width: 50%; padding-right: 1em }");
+GM_addStyle("div#extraTools { display: flex; flex-wrap: wrap; justify-content: space-between; margin-bottom: 0.5em }");
+GM_addStyle("div#extraTools > p { width: 100% }");
+GM_addStyle("div#extraTools > div { width: 50%; box-sizing: border-box; }");
 GM_addStyle("span#infoVisible { display: inline-block; text-align: right; width: 40px; }");
 GM_addStyle("div#averageYear { margin: 0px -20px 10px }");
 GM_addStyle("div#votes { position: absolute; left: 10px; width: auto; text-align: center; }");
@@ -60,10 +60,11 @@ const changeAllData = (key, list) => {
 
 const setInfoStatus = (amount) => `<p id="infoStatus">Liczba widocznych utworów: <strong><span id="infoVisible">${amount}</span>/<span>${amount}</span></strong> (<span id="infoPercent">100</span>%)`;
 
-const setCheckOnlyIsNew = (amount) => `<span><input id="onlyIsNew" type="checkbox" class="custom-check custom-checkbox" ${amount || 'disabled'}><label for="onlyIsNew"><span>Pokaż tylko nowości - ${amount} pozycji</span></label></span>`;
-const setCheckShrinkAll = (amount) => `<span><input id="shrinkAll" type="checkbox" class="custom-check custom-checkbox" ${amount || 'disabled'}><label for="shrinkAll"><span>Zwiń wszystkie grupy - ${amount} pozycji</span></label></span>`;
+const setCheckOnlyIsNew = (amount) => `<input id="onlyIsNew" type="checkbox" class="custom-check custom-checkbox" ${amount || 'disabled'}><label for="onlyIsNew"><span>Pokaż tylko nowości - ${amount} pozycji</span></label>`;
+const setCheckShrinkAll = (amount) => `<input id="shrinkAll" type="checkbox" class="custom-check custom-checkbox" ${amount || 'disabled'}><label for="shrinkAll"><span>Zwiń wszystkie grupy - ${amount} pozycji</span></label>`;
+const setCheckOnlyRanked = (amount) => `<input id="onlyRanked" type="checkbox" class="custom-check custom-checkbox" ${amount || 'disabled'}><label for="onlyRanked"><span>Pokaż tylko notowane - ${amount} pozycji</span></label>`;
 
-const setSelectByYears = () => `<label class="form-check-label">Pokaż tylko utwory z lat:</label><select id="chooseByYears"></select>`;
+const setSelectByYears = () => `<label class="form-check-label">Pokaż tylko utwory z lat:</label>&#11;<select id="chooseByYears"></select>`;
 
 const tagNew = '<span class="badge badge-primary tagNew">Nowość!</span>';
 
@@ -153,11 +154,14 @@ const setCheckboxHide = (element, rest) => {
     }
 }
 
-let checkboxes1, checkboxes2;
-
 const addCheckboxes = (setList) => {
-    extraTools.insertAdjacentHTML('beforeend', `<p id="chb1" class="checkboxes1"></p>`);
-    checkboxes1 = voteList.querySelector("#chb1");
+    extraTools.insertAdjacentHTML('beforeend', `<div id="chb1"></div>`);
+    extraTools.insertAdjacentHTML('beforeend', `<div id="chb2"></div>`);
+    extraTools.insertAdjacentHTML('beforeend', `<div id="chb3"></div>`);
+
+    const checkboxes1 = voteList.querySelector("#chb1");
+    const checkboxes2 = voteList.querySelector("#chb2");
+    const checkboxes3 = voteList.querySelector("#chb3");
 
     const checkOnlyIsNew = setCheckOnlyIsNew(listIsNew.length);
     checkboxes1.insertAdjacentHTML('beforeend', checkOnlyIsNew);
@@ -165,14 +169,17 @@ const addCheckboxes = (setList) => {
     const dicIsNew = listIsNew.reduce((dic, key) => ({...dic, [key]: true}), {});
 
     const checkShrinkAll = setCheckShrinkAll(groupedSongKeys.length);
-    checkboxes1.insertAdjacentHTML('beforeend', checkShrinkAll);
-    const shrinkAll = checkboxes1.querySelector("#shrinkAll");
+    checkboxes2.insertAdjacentHTML('beforeend', checkShrinkAll);
+    const shrinkAll = checkboxes2.querySelector("#shrinkAll");
 
-    setCheckboxOnly(onlyIsNew, [shrinkAll], dicIsNew);
-    setCheckboxHide(shrinkAll, [onlyIsNew]);
+    const checkOnlyRanked = setCheckOnlyRanked(listRanked.length);
+    checkboxes3.insertAdjacentHTML('beforeend', checkOnlyRanked);
+    const onlyRanked = checkboxes3.querySelector("#onlyRanked");
+    const dicRanked = listRanked.reduce((dic, key) => ({...dic, [key]: true}), {});
 
-    extraTools.insertAdjacentHTML('beforeend', `<p id="chb2" id="checkboxes"></p>`);
-    checkboxes2 = voteList.querySelector("#chb2");
+    setCheckboxOnly(onlyIsNew, [shrinkAll, onlyRanked], dicIsNew);
+    setCheckboxHide(shrinkAll, [onlyIsNew, onlyRanked]);
+    setCheckboxOnly(onlyRanked, [onlyIsNew, shrinkAll], dicRanked);
 }
 
 const years = { "0": {list:[], name: "NIEPRZYPISANE"} }
@@ -192,7 +199,7 @@ const setSelector = (element, keys) => {
 let selectors;
 
 const addSelectors = (setList) => {
-    extraTools.insertAdjacentHTML('beforeend', `<p id="selectors"></p>`);
+    extraTools.insertAdjacentHTML('beforeend', `<div id="selectors"></div>`);
     selectors = voteList.querySelector("#selectors");
 
     selectors.insertAdjacentHTML('beforeend', setSelectByYears());
@@ -205,7 +212,7 @@ const addSelectors = (setList) => {
 const resetSelectors = () => selectors.querySelectorAll('select').forEach(select => { select.value = "" });
 
 let voteList, listGroup, mainList, itemDict;
-let listIsNew, listVoted, votedList;;
+let listIsNew, listRanked, listVoted, votedList;
 let dicYear = {}, dicGroup = {}, dicGroupSong = {};
 let groupedKeys, groupedSongKeys;
 let groupedList, groupedIcons, groupedSongs = [];
@@ -290,6 +297,7 @@ const addTags = (listNo, setList) => {
 
     listIsNew = setList.reduce((list, item) => item.isNew ? [...list, item.id] : list, []);
     listVoted = setList.reduce((list, item) => item.votes ? [...list, item.id] : list, []);
+    listRanked = setList.reduce((list, item) => item.history ? [...list, item.id] : list, []);
 
     setList.forEach((item, i) => {
         if (!item.years) {
