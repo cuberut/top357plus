@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.8.5
+// @version      0.8.6
 // @author       cuberut
 // @description  Wspomaganie głosowania
 // @match        https://glosuj.radio357.pl/app/top/glosowanie
@@ -26,7 +26,8 @@ GM_addStyle("div#extraTools > div { width: 50%; box-sizing: border-box; }");
 GM_addStyle("span#infoVisible { display: inline-block; text-align: right; width: 40px; }");
 GM_addStyle("div#averageYear { margin: 0px -20px 10px }");
 GM_addStyle("div#votes { position: absolute; left: 10px; width: auto; text-align: center; }");
-GM_addStyle("div#votedList ol { font-size: small; padding-left: 1.5em; margin-top: 1em; }");
+GM_addStyle("div#votedList { box-sizing: border-box; max-height: 650px; overflow-x: auto; white-space: nowrap; }");
+GM_addStyle("div#votedList ol { font-size: small; padding-left: 2em; margin-top: 1em; }");
 GM_addStyle("div#votedList ol li:hover { text-decoration: line-through; cursor: pointer; }");
 GM_addStyle("ul.songGroups .gInfo { border-width: 1px 3px; border-color: #bbb; border-style: solid; cursor: pointer; }");
 GM_addStyle("ul.songGroups .gRow { border-width: 0px 3px 1px; }");
@@ -36,7 +37,10 @@ const urlApi = 'https://opensheet.elk.sh/1XC-On7vJ7H7RebPvrulg1K1ceAks3mXeKAy5Pt
 const urlSettings = `${urlApi}/settings`;
 const urlGroups = `${urlApi}/groups`;
 
-const storageName = 'shrinkGroups2024PL';
+const topType = window.location.pathname.split('/')[2];
+const currentYear = new Date().getFullYear();
+const topYear = currentYear + (topType == "top" ? 1 : 0);
+const storageName = 'shrinkGroups' + topYear + topType;
 
 const getList = async (url) => {
     const response = await fetch(url);
