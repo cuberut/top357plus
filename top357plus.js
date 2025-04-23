@@ -263,7 +263,7 @@ const addTags = (listNo, setList) => {
             button.addEventListener('mouseover', (e) => { chart.hidden = false });
             button.addEventListener('mouseout', (e) => { chart.hidden = true });
 
-            const labels = [...Array(listNo-1).keys()].map(x => (x + 2022));
+            const labels = [...Array(listNo-1).keys()].map(x => (x + 2021));
             const series = history.split(",").map(x => -x || null);
 
             new window.Chartist.Line(chart, {
