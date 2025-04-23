@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         TOP357+
-// @version      0.8.6
+// @version      0.9
 // @author       cuberut
 // @description  Wspomaganie głosowania
-// @match        https://glosuj.radio357.pl/app/top/glosowanie
+// @match        https://glosuj.radio357.pl/app/polski-top/glosowanie
 // @updateURL    https://raw.githubusercontent.com/cuberut/top357plus/main/top357plus.js
 // @downloadURL  https://raw.githubusercontent.com/cuberut/top357plus/main/top357plus.js
 // @require      https://cdn.jsdelivr.net/chartist.js/latest/chartist.min.js
@@ -33,7 +33,7 @@ GM_addStyle("ul.songGroups .gInfo { border-width: 1px 3px; border-color: #bbb; b
 GM_addStyle("ul.songGroups .gRow { border-width: 0px 3px 1px; }");
 GM_addStyle("ul.songGroups .gEnd { border-bottom-width: 3px; }");
 
-const urlApi = 'https://opensheet.elk.sh/1XC-On7vJ7H7RebPvrulg1K1ceAks3mXeKAy5PtxdXus/';
+const urlApi = 'https://opensheet.elk.sh/1pWopWnJ9Gogfv7U3_2QWoHFLtFv7CTLli3hLKe_BcvQ/';
 const urlSettings = `${urlApi}/settings`;
 const urlGroups = `${urlApi}/groups`;
 
@@ -235,7 +235,7 @@ const addTags = (listNo, setList) => {
         [item.id]: +item.year
     }), []);
 
-    const layoutRight = document.querySelector('div[slug="top"] .layout__right-column .layout__photo');
+    const layoutRight = document.querySelector('div[slug="polski-top"] .layout__right-column .layout__photo');
     layoutRight.style.right = "auto";
     const layoutPhoto = layoutRight.querySelector('div');
     layoutPhoto.remove();
